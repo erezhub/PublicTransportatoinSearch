@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute" creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import com.google.maps.InfoWindowOptions;
+			import com.ui.StationMarker;
+			import com.data.StationData;
+			import mx.controls.Alert;
+			import com.google.maps.styles.StrokeStyle;
+			import com.google.maps.overlays.PolygonOptions;
+			import com.google.maps.overlays.Polygon;
+			import com.data.DataRepository;
+			import com.google.maps.MapMouseEvent;
+			import com.google.maps.MapZoomEvent;
+			import com.google.maps.LatLngBounds;
+			import com.google.maps.styles.FillStyle;
+			import com.google.maps.overlays.MarkerOptions;
+			import com.google.maps.overlays.Marker;
+			import be.boulevart.google.ajaxapi.search.GoogleSearchResult;
+			import be.boulevart.google.ajaxapi.search.local.data.GoogleLocalSearchItem;
+			import be.boulevart.google.events.GoogleApiEvent;
+			import be.boulevart.google.ajaxapi.search.local.GoogleLocalSearch;
+			import com.google.maps.controls.ScaleControl;
+			import com.google.maps.controls.ZoomControl;
+			import com.google.maps.LatLng;
+			import com.google.maps.MapEvent;
+			import com.google.maps.Map;
+			
+			private var map:Map;
+			private var origMarker:Marker;
+			private var origCircle:Polygon;
+			private var destMarker:Marker;
+			private var destCircle:Polygon;
+			private var pixelsPerKilometer:Number;
+			private var degreesPerKilometerV:Number;
+			private var degreesPerKilometerH:Number;
+			
+			private function init():void
+			{
+				initMap();
+			}
+			
+			private function initMap():void
+			{
+				map = new Map();
+				map.key = "ABQIAAAAH6Q-TU1dO98m3w6sbDTZthS6gDZNIAXsUcc-GKDuRPbKArfD3xS9crTqFwN2q--6zpvwV5oYICuVmA";
+				map.setSize(new Point(mapContainer.width, mapContainer.height));
+				//map.y = 20;
+				map.addEventListener(MapEvent.MAP_READY, onMapReady);
+				//map.addEventListener(MapMoveEvent.MOVE_END, onMoveEnd);
+				mapContainer.addChild(map);
+			}
+			
+			private function onMapReady(event:MapEvent):void
+			{
+				map.setCenter(new LatLng(51.51222221603374, -0.12547302246094016),16);
+				//map.setCenter(new LatLng(25.75,-80.21),16);
+				
+				map.addControl(new ZoomControl());
+				map.addControl(new ScaleControl());
+				
+				map.addEventListener(MapZoomEvent.ZOOM_CHANGED, onChangeZoom);
+				//map.addEventListener(MapMouseEvent.CLICK, onMapClicked);
+				
+				calcDistance();
+				DataRepository.loadData();				
+			}
+			
+			private function onMapClicked(event:MapMouseEvent):void
+			{
+				trace(event.latLng.lat(),event.latLng.lng());
+			}
+			
+			private function calcDistance():void
+			{
+				var latLngA:LatLng = map.getCenter();
+				var markerA:Marker = new Marker(latLngA);
+				//map.addOverlay(markerA);
+				
+				var latLngB:LatLng = new LatLng(latLngA.lat()+0.1,latLngA.lng());
+				var markerB:Marker = new Marker(latLngB);
+				//map.addOverlay(markerB);
+				
+				var dist:Number = (latLngA.distanceFrom(latLngB));
+				degreesPerKilometerV = 100/dist;
+				latLngB = new LatLng(latLngA.lat() + 1/(dist*0.01),latLngA.lng());
+				markerB = new Marker(latLngB);
+				//map.addOverlay(markerB);
+				
+				/*var pointA:Point = map.fromLatLngToPoint(markerA.getLatLng());
+				var pointB:Point = map.fromLatLngToPoint(markerB.getLatLng());
+				pixelsPerKilometer = Point.distance(pointA,pointB);*/
+								
+				var latLngC:LatLng = new LatLng(latLngA.lat(), latLngA.lng() + 0.1);
+				dist = (latLngA.distanceFrom(latLngC));
+				degreesPerKilometerH = 100/dist;
+			}
+			
+			private function search():void
+			{
+				map.clearOverlays();
+				var gls:GoogleLocalSearch = new GoogleLocalSearch();
+				gls.search(originInput.text);
+				gls.addEventListener(GoogleApiEvent.LOCAL_SEARCH_RESULT, onOriginSearchResults);
+			}
+			
+			private function onOriginSearchResults(event:GoogleApiEvent):void
+			{
+				if (origMarker)
+				{
+					map.removeOverlay(origMarker);
+				}
+				var result:GoogleLocalSearchItem = (event.data as GoogleSearchResult).results[0];
+				if (result)
+				{
+					var latLng:LatLng = new LatLng(Number(result.latitude), Number(result.longitude))
+					var markerOptions:MarkerOptions = new MarkerOptions();
+					markerOptions.fillStyle = new FillStyle({color: 0x00ff00});
+					origMarker = new Marker(latLng, markerOptions);
+	
+					origCircle = setCircle(origCircle,latLng,originCircleRadious.value);
+					map.addOverlay(origMarker);
+					
+					var gls:GoogleLocalSearch = new GoogleLocalSearch();
+					gls.search(destinationInput.text);
+					gls.addEventListener(GoogleApiEvent.LOCAL_SEARCH_RESULT, onDestinationSearchResults);
+				}
+				else
+				{
+					Alert.show("Origin not found","error");
+				}
+			}
+			
+			private function onDestinationSearchResults(event:GoogleApiEvent):void
+			{
+				if (destMarker)
+				{
+					map.removeOverlay(destMarker);
+				}
+				var result:GoogleLocalSearchItem = (event.data as GoogleSearchResult).results[0];
+				if (result)
+				{
+					var latLng:LatLng = new LatLng(Number(result.latitude), Number(result.longitude))
+					destMarker = new Marker(latLng);
+					map.addOverlay(destMarker);
+					destCircle = setCircle(destCircle,latLng,destinationCircleRadious.value);
+					
+					var origLatLng:LatLng =origMarker.getLatLng();
+					var swLatLng:LatLng = new LatLng(Math.min(latLng.lat(),origLatLng.lat()),Math.min(latLng.lng(),origLatLng.lng()));
+					var neLatLng:LatLng = new LatLng(Math.max(latLng.lat(),origLatLng.lat()),Math.max(latLng.lng(),origLatLng.lng()));
+					var lat:Number = swLatLng.lat() + (neLatLng.lat()-swLatLng.lat())/2;
+					var lng:Number = swLatLng.lng() + (neLatLng.lng()-swLatLng.lng())/2
+					var centerLagLng:LatLng = new LatLng(lat,lng);
+					var latlngBounds:LatLngBounds = new LatLngBounds(swLatLng, neLatLng);
+					map.setCenter(centerLagLng,map.getBoundsZoomLevel(latlngBounds));
+					
+					var stationsNearOrig:Array = checkIfWithin(origLatLng,originCircleRadious.value);
+					var stationsNearDest:Array = checkIfWithin(latLng,destinationCircleRadious.value);
+					if (stationsNearOrig.length && stationsNearDest.length)
+					{
+						findMatchingLines(stationsNearOrig,stationsNearDest);
+					}
+					else if (stationsNearDest.length == 0 && stationsNearOrig.length == 0)
+					{
+						Alert.show("No stations found in the distance you mentioned.","Error");
+					}
+					else if (stationsNearDest.length == 0)
+					{
+						Alert.show("No statoins were found near you destination.","Error");						
+					}
+					else
+					{
+						Alert.show("No statoins were found near you origin.","Error");
+					}
+				}
+				else
+				{
+					Alert.show("Destination not found","error");
+				}
+			}
+			
+			private function onChangeZoom(event:MapZoomEvent):void
+			{
+				calcDistance();
+				origCircle = setCircle(origCircle,origMarker.getLatLng(),originCircleRadious.value);
+				destCircle = setCircle(destCircle,destMarker.getLatLng(),destinationCircleRadious.value);				
+			}
+			
+			private function setCircle(circle:Polygon, latLng:LatLng, radius:Number):Polygon
+			{
+				if (circle)
+				{
+					map.removeOverlay(circle);
+				}
+				/*var circle:Shape = new Shape();
+				circle.graphics.beginFill(0xaaaaaa,0.5);
+				circle.graphics.lineStyle(1);
+				circle.graphics.drawCircle(0,0,pixelsPerKilometer*originCircleRadious.value);
+				var circleMarkerOptions:MarkerOptions = new MarkerOptions();
+				circleMarkerOptions.hasShadow = false;					
+				circleMarkerOptions.icon = circle;
+				origCircle = new Marker(origMarker.getLatLng(),circleMarkerOptions);
+				map.addOverlay(origCircle);*/
+				
+				var lat:Number = latLng.lat()
+				var lng:Number = latLng.lng();
+				var d2r:Number = Math.PI/180;
+	          	var r2d:Number = 180/Math.PI;
+	          	radius = Math.round((Number(radius)/1.609)*100000)/100000;
+	          	var circleLat:Number = radius * 0.014483;  // Convert statute miles into degrees latitude
+	          	var circleLng:Number = circleLat/Math.cos(lat*d2r); 
+	          	var circleLatLngs:Array = new Array();
+	          	for (var i:Number = 0; i < 66; i++) 
+	          	{ 
+		            var theta:Number = Math.PI * (i/32); 
+		            var vertexLat:Number = lat + (circleLat * Math.sin(theta)); 
+		            var vertexLng:Number = lng + (circleLng * Math.cos(theta)); 
+		            var latLng:LatLng = new LatLng(vertexLat, vertexLng); 
+		            circleLatLngs.push(latLng); 
+		        }
+		      
+		        var polygonOptions:PolygonOptions = new PolygonOptions();
+		        var fillStyle:FillStyle = new FillStyle();
+		        fillStyle.alpha = 0.5;//fillOpacity;
+		        fillStyle.color = 0xaaaaaa//fillColor;
+		        polygonOptions.fillStyle = fillStyle; 
+		
+		        var strokeStyle:StrokeStyle = new StrokeStyle();
+		        strokeStyle.alpha = 1;//strokeOpacity;
+		        strokeStyle.color = 0;//strokeColor;
+		        strokeStyle.thickness = 1;//strokeWidth;
+		        polygonOptions.strokeStyle = strokeStyle
+		
+		        circle = new Polygon(circleLatLngs, polygonOptions);
+		        map.addOverlay(circle);
+		        return circle;
+			}
+			
+			private function checkIfWithin(latLng:LatLng, radius:Number):Array
+			{
+				var origLatLng:LatLng = origMarker.getLatLng();
+				/*var markerOptionsA:MarkerOptions = new MarkerOptions();
+				markerOptionsA.fillStyle = new FillStyle({color: 0x0000ff});
+				var markerOptionsB:MarkerOptions = new MarkerOptions();
+				markerOptionsB.fillStyle = new FillStyle({color: 0x00ffff});*/
+				var deltaV:Number = degreesPerKilometerV*radius;
+				var deltaH:Number = degreesPerKilometerH*radius;
+				var boundsSW:LatLng = new LatLng(latLng.lat() - deltaV,latLng.lng() - deltaH);
+				var boundsNE:LatLng = new LatLng(latLng.lat() + deltaV,latLng.lng() + deltaH);
+				//map.addOverlay(new Marker(boundsNE,markerOptionsA));
+				//map.addOverlay(new Marker(boundsSW,markerOptionsB));				
+				var bounds:LatLngBounds = new LatLngBounds(boundsSW,boundsNE);
+				return DataRepository.findStationsInBound(bounds,map,latLng,radius*1000);
+				//if (bounds.containsLatLng(destMarker.getLatLng())) trace(origMarker.getLatLng().distanceFrom(destMarker.getLatLng())<originCircleRadious.value*1000);
+			}
+			
+			private function findMatchingLines(origStations:Array, destStations:Array):void
+			{
+				var maxDistance:Number = originCircleRadious.value*1000 + destinationCircleRadious.value*1000;
+				var origStationData:StationData;
+				var destStationData:StationData;
+				var origLines:Array = [];
+				var lineNumber:int;
+				for (var i:int = 0; i < origStations.length; i++)
+				{
+					var currOrigStationData:StationData = origStations[i];
+					var origTotalLines:int = currOrigStationData.totalLines;
+					for (var j:int = 0; j < origTotalLines; j++)
+					{
+						var currLineData:Object = currOrigStationData.getLineDirectionByIndex(j);
+						if (origLines.indexOf(currLineData.line) == -1) origLines.push(DataRepository.getLineData(currLineData.line));
+						for (var k:int = 0; k < destStations.length; k++)
+						{
+							var currDestStationData:StationData = destStations[k];
+							if (currDestStationData.hasLine(currLineData.line, currLineData.direction) && currDestStationData.distance + currOrigStationData.distance < maxDistance)
+							{
+								origStationData = currOrigStationData
+								destStationData = currDestStationData;
+								maxDistance = currDestStationData.distance + currOrigStationData.distance;
+								lineNumber = currLineData.line;
+							}
+						}
+					}
+				}
+				if (origStationData && destStationData)
+				{
+					var markerOptions:MarkerOptions = new MarkerOptions({fillStyle: {color: 0xaaaa00}});
+					var origStationMarker:StationMarker = new StationMarker(origStationData,markerOptions);
+					origStationMarker.addEventListener(MapMouseEvent.CLICK, onClickMarker); 				
+					map.addOverlay(origStationMarker);
+					
+					var destStationMarker:StationMarker = new StationMarker(destStationData,markerOptions);
+					destStationMarker.addEventListener(MapMouseEvent.CLICK, onClickMarker); 				
+					map.addOverlay(destStationMarker);
+					
+					Alert.show("Use line no. " + lineNumber+", from " + origStationData.name + " to " + destStationData.name);
+				}				
+				else
+				{
+					
+					Alert.show("No match was found","Error");
+				}
+			}
+			
+			private function onClickMarker(event:MapMouseEvent):void
+			{
+				var marker:StationMarker = event.target as StationMarker;
+				showMarkerData(marker);	 
+			}
+			
+			private function showMarkerData(marker:StationMarker):void
+			{
+				marker.openInfoWindow(new InfoWindowOptions({title: "Station No." + marker.stationData.id,contentHTML: marker.stationData.description}));
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" height="100%">
+		<mx:Panel width="250" height="100%" layout="absolute" title="Public Transportatoin Locator">
+		<mx:VBox paddingTop="5" paddingLeft="5">
+			<mx:HBox x="10" y="10" width="100%">
+				<mx:Label text="Origin:" width="76"/>
+				<mx:TextInput height="51" id="originInput" width="137" text="west st london"/>
+			</mx:HBox>
+			<mx:HBox x="10" width="100%">
+				<mx:Label text="Stations within"/>
+				<mx:NumericStepper stepSize="0.1" minimum="0.1" maximum="5" enabled="true" width="53" id="originCircleRadious"/>
+				<mx:Label text="km."/>
+			</mx:HBox>
+			<mx:HBox x="10" width="100%" horizontalAlign="left">
+				<mx:Label text="Destination:" width="76"/>
+				<mx:TextInput height="51" width="137" id="destinationInput" text="victoria station london"/>
+			</mx:HBox>
+			<mx:HBox x="10" width="100%">
+				<mx:Label text="Stations within"/>
+				<mx:NumericStepper stepSize="0.1" minimum="0.1" maximum="5" enabled="true" width="53" id="destinationCircleRadious"/>
+				<mx:Label text="km."/>
+			</mx:HBox>
+		</mx:VBox>	
+		<mx:Button x="82" y="186" label="Search" click="search()"/>
+	</mx:Panel>
+	<mx:Canvas width="100%" height="100%" id="mapContainer">
+	</mx:Canvas>
+	</mx:HBox>
+	
+	
+	
+</mx:Application>

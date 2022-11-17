@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<transportationData>
+	<stations>
+		<station id="10" name="Soho, Cambridge Circus Denmark St (Stop D)" lat="51.5134" lng="-0.1292" lines="" type="bus"  />
+		<station id="11" name="Soho, Cambridge Circus Denmark St (Stop M)" lat="51.5125" lng="-0.1287" lines="" type="bus"  />
+		<station id="12" name="Leicester Square, Leicester Square (Stop J)" lat="51.5116" lng="-0.1283" lines="" type="bus"  />
+		<station id="13" name="Leicester Square, Leicester Square (Stop L)" lat="51.51055" lng="-0.12847" lines="" type="bus" />
+		<station id="14" name="Covent Garden, Covent Garden (Stop)Address:" lat="51.51345" lng="-0.12394" lines="" type="bus"  />
+		<station id="15" name="Soho, Covent Garden Catherine St (Stop)" lat="51.5128" lng="-0.12107" lines="" type="bus"  />
+		<station id="16" name="Soho, Covent Garden Catherine St (Stop C)" lat="	51.51235" lng="-0.11958" lines="" type="bus"  />
+		<station id="17" Soho, Cambridge Circus Denmark St (Stop B)" lat="51.51366" lng="-0.12852" lines="" type="bus"  />
+		<station id="18" name="Leicester Square" lat="51.511221" lng="-0.128236" lines="" type="sw"  />
+		<station id="19" name="Covent Garden" lat="51.51291" lng="-0.124159" lines="" type="sw"  />
+		<station id="20" name="Charing Cross" lat="51.51291" lng="-0.124159" lines="" type="sw"  />
+	</stations>
+	<lines>
+		<line type="" id="" stations="" />
+	</lines>
+</transportationData>
